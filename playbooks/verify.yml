@@ -1,0 +1,78 @@
+---
+- name: Post-change verification
+  hosts: all
+  become: true
+  vars:
+    expected_sysctl:
+      net.ipv4.ip_forward: "0"
+      net.ipv4.conf.all.send_redirects: "0"
+      kernel.randomize_va_space: "2"
+
+  tasks:
+    - name: Initialise verification results
+      ansible.builtin.set_fact:
+        verification_passed: true
+        failed_checks: []
+
+    - name: Verify sysctl values
+      ansible.builtin.command:
+        cmd: "sysctl -n {{ item.key }}"
+      register: sysctl_verify
+      loop: "{{ expected_sysctl | dict2items }}"
+      changed_when: false
+
+    - name: Record sysctl failures
+      ansible.builtin.set_fact:
+        verification_passed: false
+        failed_checks: "{{ failed_checks + ['SYSCTL FAIL: ' + item.item.key] }}"
+      loop: "{{ sysctl_verify.results }}"
+      when: item.stdout != item.item.value
+
+    - name: Verify SSH hardening
+      ansible.builtin.command:
+        cmd: grep "^PermitRootLogin no" /etc/ssh/sshd_config
+      register: ssh_verify
+      changed_when: false
+      failed_when: false
+
+    - name: Record SSH verification failure
+      ansible.builtin.set_fact:
+        verification_passed: false
+        failed_checks: "{{ failed_checks + ['SSH FAIL: PermitRootLogin not hardened'] }}"
+      when: ssh_verify.rc != 0
+
+    - name: Verify auditd running
+      ansible.builtin.service_facts:
+
+    - name: Record auditd failure
+      ansible.builtin.set_fact:
+        verification_passed: false
+        failed_checks: "{{ failed_checks + ['SERVICE FAIL: auditd not running'] }}"
+      when: >
+        ansible_facts.services['auditd.service'] is not defined or
+        ansible_facts.services['auditd.service'].state != 'running'
+
+    - name: Write verification report
+      ansible.builtin.copy:
+        content: |
+          VERIFICATION REPORT — {{ ansible_date_time.iso8601 }}
+          Host: {{ inventory_hostname }}
+          Result: {{ 'PASSED ✅' if verification_passed else 'FAILED ❌' }}
+          Failed Checks:
+          {% for check in failed_checks %}
+          - {{ check }}
+          {% endfor %}
+        dest: /tmp/verification_report.txt
+        mode: '0644'
+
+    - name: Print final verification result
+      ansible.builtin.debug:
+        msg: >
+          {{ '✅ VERIFICATION PASSED — node is fully compliant' 
+          if verification_passed else 
+          '❌ VERIFICATION FAILED — ' + failed_checks | join(', ') }}
+
+    - name: Fail if verification did not pass
+      ansible.builtin.fail:
+        msg: "Post-change verification FAILED on {{ inventory_hostname }}: {{ failed_checks | join(', ') }}"
+      when: not verification_passed
