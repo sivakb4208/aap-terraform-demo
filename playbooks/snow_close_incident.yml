@@ -1,0 +1,29 @@
+---
+- name: Close ServiceNow Incident after successful remediation
+  hosts: localhost
+  gather_facts: no
+  become: no
+  tasks:
+    - name: Create resolved incident
+      uri:
+        url: "{{ sn_host }}/api/now/table/incident"
+        method: POST
+        user: "{{ sn_username }}"
+        password: "{{ sn_password }}"
+        force_basic_auth: yes
+        body_format: json
+        body:
+          short_description: "Drift Auto-Remediated on {{ target_host }}"
+          description: "Configuration drift was detected on {{ target_host }} and successfully auto-remediated by AAP. No manual intervention needed."
+          impact: "3"
+          urgency: "3"
+          caller_id: "admin"
+          state: "6"
+          close_code: "Solved (Permanently)"
+          close_notes: "Drift auto-remediated successfully by AAP workflow."
+        status_code: 201
+      register: snow_response
+
+    - name: Print Incident Number
+      debug:
+        msg: "Incident CLOSED: {{ snow_response.json.result.number }}"
