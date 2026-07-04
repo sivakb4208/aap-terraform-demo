@@ -1,10 +1,10 @@
 ---
-- name: Create or Close ServiceNow Incident
+- name: Create ServiceNow Incident for Drift
   hosts: localhost
   gather_facts: no
   become: no
   tasks:
-    - name: Create ServiceNow Incident for drift
+    - name: Create ServiceNow Incident
       uri:
         url: "{{ sn_host }}/api/now/table/incident"
         method: POST
@@ -13,8 +13,8 @@
         force_basic_auth: yes
         body_format: json
         body:
-          short_description: "[AIOps] Configuration Drift Detected on {{ target_host }}"
-          description: "Automated drift detection found issues on {{ target_host }}. Remediation attempted by AAP. Please verify."
+          short_description: "Configuration Drift Detected on {{ target_host }}"
+          description: "Automated drift detection found configuration issues on {{ target_host }}. AAP has attempted auto-remediation. Please verify compliance."
           impact: "2"
           urgency: "2"
           caller_id: "admin"
