@@ -1,0 +1,27 @@
+---
+- name: Open ServiceNow Incident for Drift
+  hosts: localhost
+  gather_facts: no
+  become: no
+  tasks:
+    - name: Open ServiceNow Incident
+      uri:
+        url: "{{ sn_host }}/api/now/table/incident"
+        method: POST
+        user: "{{ sn_username }}"
+        password: "{{ sn_password }}"
+        force_basic_auth: yes
+        body_format: json
+        body:
+          short_description: "Drift Detected on {{ target_host }} - Manual Intervention Needed"
+          description: "Configuration drift was detected on {{ target_host }}. Auto-remediation attempted but FAILED. Manual intervention required. Check /tmp/drift_report.txt on the host."
+          impact: "1"
+          urgency: "1"
+          caller_id: "admin"
+          state: "1"
+        status_code: 201
+      register: snow_response
+
+    - name: Print Incident Number
+      debug:
+        msg: "Incident OPENED: {{ snow_response.json.result.number }}"
