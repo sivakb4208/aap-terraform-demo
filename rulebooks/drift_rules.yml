@@ -10,6 +10,6 @@
     - name: Trigger drift detection workflow
       condition: event.i >= 0
       action:
-        run_job_template:
+        run_workflow_template:
           name: "Drift-Detection-Workflow"
           organization: Default
